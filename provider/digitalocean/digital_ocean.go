@@ -165,6 +165,12 @@ func (p *DigitalOceanProvider) Records(ctx context.Context) ([]*endpoint.Endpoin
 		}
 
 		for _, r := range records {
+			log.WithFields(log.Fields{
+				"zone":      zone.Name,
+				"type":      r.Type,
+				"name":      r.Name,
+				"supported": p.SupportedRecordType(r.Type),
+			}).Debug("Found record")
 			if p.SupportedRecordType(r.Type) {
 				name := r.Name + "." + zone.Name
 				data := r.Data
@@ -345,8 +351,10 @@ func (p *DigitalOceanProvider) submitChanges(ctx context.Context, changes *digit
 			continue
 		}
 
-		_, _, err := p.Client.CreateRecord(ctx, c.Domain, c.Options)
+		_, resp, err := p.Client.CreateRecord(ctx, c.Domain, c.Options)
 		if err != nil {
+			log.Debugf("Unable to create record on DigitalOcean %v", err.Error())
+			log.WithField("response", resp).Debug("Response from DigitalOcean")
 			return err
 		}
 	}
@@ -368,8 +376,10 @@ func (p *DigitalOceanProvider) submitChanges(ctx context.Context, changes *digit
 			continue
 		}
 
-		_, _, err := p.Client.EditRecord(ctx, u.Domain, u.DomainRecord.ID, u.Options)
+		_, resp, err := p.Client.EditRecord(ctx, u.Domain, u.DomainRecord.ID, u.Options)
 		if err != nil {
+			log.Debugf("Unable to edit record on DigitalOcean %v", err.Error())
+			log.WithField("response", resp).Debug("Response from DigitalOcean")
 			return err
 		}
 	}
@@ -645,17 +655,27 @@ func (p *DigitalOceanProvider) ApplyChanges(ctx context.Context, planChanges *pl
 	updatesByDomain := endpointsByZone(zoneNameIDMapper, planChanges.UpdateNew)
 	deletesByDomain := endpointsByZone(zoneNameIDMapper, planChanges.Delete)
 
+	// Log the endpoints that were found.
+	log.WithFields(log.Fields{
+		"createsByDomain": createsByDomain,
+		"updatesByDomain": updatesByDomain,
+		"deletesByDomain": deletesByDomain,
+	}).Debug("Endpoints for apply changes")
+
 	var changes digitalOceanChanges
 
 	if err := processCreateActions(recordsByDomain, createsByDomain, &changes); err != nil {
+		log.Errorf("Error processing create actions: %v", err)
 		return err
 	}
 
 	if err := processUpdateActions(recordsByDomain, updatesByDomain, &changes); err != nil {
+		log.Errorf("Error processing update actions: %v", err)
 		return err
 	}
 
 	if err := processDeleteActions(recordsByDomain, deletesByDomain, &changes); err != nil {
+		log.Errorf("Error processing delete actions: %v", err)
 		return err
 	}
 

@@ -261,7 +261,7 @@ func (p *Plan) Calculate() *Plan {
 		Current:        p.Current,
 		Desired:        p.Desired,
 		Changes:        changes,
-		ManagedRecords: []string{endpoint.RecordTypeA, endpoint.RecordTypeAAAA, endpoint.RecordTypeCNAME},
+		ManagedRecords: []string{endpoint.RecordTypeA, endpoint.RecordTypeAAAA, endpoint.RecordTypeCNAME, endpoint.RecordTypeMX},
 	}
 
 	return plan

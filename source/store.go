@@ -318,10 +318,13 @@ func BuildWithConfig(ctx context.Context, source string, p ClientGenerator, cfg 
 		if err != nil {
 			return nil, err
 		}
+		log.Debugf("new CRD Client: api version: %s source kind %s", cfg.CRDSourceAPIVersion, cfg.CRDSourceKind)
 		crdClient, scheme, err := NewCRDClientForAPIVersionKind(client, cfg.KubeConfig, cfg.APIServerURL, cfg.CRDSourceAPIVersion, cfg.CRDSourceKind)
 		if err != nil {
+			log.Debugf("new CRD Client: error %s", err.Error())
 			return nil, err
 		}
+		log.Debugf("Init new CRDSource")
 		return NewCRDSource(crdClient, cfg.Namespace, cfg.CRDSourceKind, cfg.AnnotationFilter, cfg.LabelFilter, scheme, cfg.UpdateEvents)
 	case "skipper-routegroup":
 		apiServerURL := cfg.APIServerURL
