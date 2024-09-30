@@ -171,6 +171,8 @@ func (p *Plan) Calculate() *Plan {
 		p.DomainFilter = endpoint.MatchAllDomainFilters(nil)
 	}
 
+	log.Debugf("Current plan managed records: %v\nexclude records: %v\ncurrent: %v\n", p.ManagedRecords, p.ExcludeRecords, p.Current)
+
 	for _, current := range filterRecordsForPlan(p.Current, p.DomainFilter, p.ManagedRecords, p.ExcludeRecords) {
 		t.addCurrent(current)
 	}
@@ -178,9 +180,13 @@ func (p *Plan) Calculate() *Plan {
 		t.addCandidate(desired)
 	}
 
+	log.Debugf("Plan table:\n%v\n", t)
+
 	changes := &Changes{}
 
 	for key, row := range t.rows {
+		log.Debugf("Processing row for %s\n", key)
+		log.Debugf("Current: %v\n", row.current)
 		// dns name not taken
 		if len(row.current) == 0 {
 			recordsByType := t.resolver.ResolveRecordTypes(key, row)
@@ -202,15 +208,21 @@ func (p *Plan) Calculate() *Plan {
 
 			// apply changes for each record type
 			recordsByType := t.resolver.ResolveRecordTypes(key, row)
+			log.Debug("Records by Type")
 			for _, records := range recordsByType {
 				// record type not desired
+				log.Debugf("current recods: %v", records.current)
+				log.Debugf("desired recods: %v", records.candidates)
+
 				if records.current != nil && len(records.candidates) == 0 {
 					changes.Delete = append(changes.Delete, records.current)
 				}
 
 				// new record type desired
 				if records.current == nil && len(records.candidates) > 0 {
+					log.Debugf("we should to create a new record")
 					update := t.resolver.ResolveCreate(records.candidates)
+					log.Debugf("Update is %v", update)
 					// creates are evaluated after all domain records have been processed to
 					// validate that this external dns has ownership claim on the domain before
 					// adding the records to planned changes.
@@ -231,8 +243,12 @@ func (p *Plan) Calculate() *Plan {
 
 			if len(creates) > 0 {
 				// only add creates if the external dns has ownership claim on the domain
+				log.Debugf("We have a mew records: %v", creates)
 				ownersMatch := true
 				for _, current := range row.current {
+					log.Debugf("Current is: %v", current)
+					log.Debugf("Plans owner id: %s", p.OwnerID)
+					log.Debugf("Current owned by owber id?: %v", current.IsOwnedBy(p.OwnerID))
 					if p.OwnerID != "" && !current.IsOwnedBy(p.OwnerID) {
 						ownersMatch = false
 					}
@@ -258,10 +274,13 @@ func (p *Plan) Calculate() *Plan {
 	}
 
 	plan := &Plan{
+		OwnerID:        p.OwnerID,
 		Current:        p.Current,
 		Desired:        p.Desired,
 		Changes:        changes,
-		ManagedRecords: []string{endpoint.RecordTypeA, endpoint.RecordTypeAAAA, endpoint.RecordTypeCNAME, endpoint.RecordTypeMX},
+		ManagedRecords: p.ManagedRecords,
+		ExcludeRecords: p.ExcludeRecords,
+		DomainFilter:   p.DomainFilter,
 	}
 
 	return plan
@@ -324,8 +343,11 @@ func filterRecordsForPlan(records []*endpoint.Endpoint, domainFilter endpoint.Ma
 			log.Debugf("ignoring record %s that does not match domain filter", record.DNSName)
 			continue
 		}
+		log.Debugf("considering record %s %s for plan with managed %v and excluded %v\n", record.DNSName, record.RecordType, managedRecords, excludeRecords)
 		if IsManagedRecord(record.RecordType, managedRecords, excludeRecords) {
 			filtered = append(filtered, record)
+		} else {
+			log.Debugf("record %s %s is ignored\n", record.DNSName, record.RecordType)
 		}
 	}
 

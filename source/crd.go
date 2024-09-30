@@ -170,14 +170,18 @@ func (cs *crdSource) Endpoints(ctx context.Context) ([]*endpoint.Endpoint, error
 
 	result, err = cs.List(ctx, &metav1.ListOptions{LabelSelector: cs.labelSelector.String()})
 	if err != nil {
+		log.Debugf("Failed to list endpoints from CRD: %s: %v", cs.namespace, err)
 		return nil, err
 	}
+	log.Debugf("Endpoints from crd: %s: %v", cs.namespace, result.Items)
 
 	result, err = cs.filterByAnnotations(result)
 
 	if err != nil {
+		log.Debugf("Failed to filter endpoints by annotations from CRD: %s: %v", cs.namespace, err)
 		return nil, err
 	}
+	log.Debugf("Endpoints filtered by annotations from crd: %s: %v", cs.namespace, result.Items)
 
 	for _, dnsEndpoint := range result.Items {
 		// Make sure that all endpoints have targets for A or CNAME type

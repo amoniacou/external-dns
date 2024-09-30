@@ -223,7 +223,9 @@ func (c *Controller) RunOnce(ctx context.Context) error {
 	ctx = context.WithValue(ctx, provider.RecordsContextKey, records)
 
 	endpoints, err := c.Source.Endpoints(ctx)
+	log.Debugf("Endpoints %v", endpoints)
 	if err != nil {
+		log.Errorf("Unable to get endpoints from source %v", err)
 		sourceErrorsTotal.Inc()
 		deprecatedSourceErrors.Inc()
 		return err
@@ -241,6 +243,8 @@ func (c *Controller) RunOnce(ctx context.Context) error {
 	}
 	registryFilter := c.Registry.GetDomainFilter()
 
+	log.Debugf("Endpoints before registry domain filter: %v", endpoints)
+
 	plan := &plan.Plan{
 		Policies:       []plan.Policy{c.Policy},
 		Current:        records,
@@ -252,6 +256,7 @@ func (c *Controller) RunOnce(ctx context.Context) error {
 	}
 
 	plan = plan.Calculate()
+	log.Debugf("changes from plan: %v", plan.Changes)
 
 	if plan.Changes.HasChanges() {
 		err = c.Registry.ApplyChanges(ctx, plan.Changes)

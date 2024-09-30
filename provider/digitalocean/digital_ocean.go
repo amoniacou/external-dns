@@ -594,8 +594,13 @@ func processDeleteActions(
 		}
 
 		records := recordsByDomain[domain]
+		log.WithFields(log.Fields{
+			"domain":  domain,
+			"records": records,
+		}).Debug("Records by domain to")
 
 		for _, ep := range deletes {
+			log.Debugf("Try to madee delete action for endpoint %v", ep)
 			matchingRecords := getMatchingDomainRecords(records, domain, ep)
 
 			if len(matchingRecords) == 0 {
@@ -604,6 +609,12 @@ func processDeleteActions(
 					"dnsName":    ep.DNSName,
 					"recordType": ep.RecordType,
 				}).Warn("Records to delete not found.")
+			} else {
+				log.WithFields(log.Fields{
+					"domain":          domain,
+					"matchingRecords": matchingRecords,
+					"recordType":      ep.RecordType,
+				}).Debug("Found records to delete")
 			}
 
 			for _, record := range matchingRecords {
@@ -611,7 +622,7 @@ func processDeleteActions(
 				for _, t := range ep.Targets {
 					v1 := t
 					v2 := record.Data
-					if ep.RecordType == endpoint.RecordTypeCNAME {
+					if ep.RecordType == endpoint.RecordTypeCNAME || ep.RecordType == endpoint.RecordTypeMX {
 						v1 = strings.TrimSuffix(t, ".")
 						v2 = strings.TrimSuffix(t, ".")
 					}
@@ -619,6 +630,11 @@ func processDeleteActions(
 						doDelete = true
 					}
 				}
+
+				log.WithFields(log.Fields{
+					"record":   record,
+					"dodelete": doDelete,
+				}).Debug("Checking if we should delete the record")
 
 				if doDelete {
 					changes.Deletes = append(changes.Deletes, &digitalOceanChangeDelete{
