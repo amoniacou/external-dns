@@ -76,6 +76,7 @@ Known providers using webhooks:
 
 | Provider              | Repo                                                                 |
 |-----------------------|----------------------------------------------------------------------|
+| Abion                 | https://github.com/abiondevelopment/external-dns-webhook-abion       |
 | Adguard Home Provider | https://github.com/muhlba91/external-dns-provider-adguard            |
 | Anexia                | https://github.com/ProbstenHias/external-dns-anexia-webhook          |
 | Bizfly Cloud          | https://github.com/bizflycloud/external-dns-bizflycloud-webhook      |
@@ -83,8 +84,10 @@ Known providers using webhooks:
 | Gcore                 | https://github.com/G-Core/external-dns-gcore-webhook                 |
 | GleSYS                | https://github.com/glesys/external-dns-glesys                        |
 | Hetzner               | https://github.com/mconfalonieri/external-dns-hetzner-webhook        |
+| Huawei Cloud          | https://github.com/setoru/external-dns-huaweicloud-webhook |
 | IONOS                 | https://github.com/ionos-cloud/external-dns-ionos-webhook            |
 | Infoblox              | https://github.com/AbsaOSS/external-dns-infoblox-webhook             |
+| Mikrotik              | https://github.com/mirceanton/external-dns-provider-mikrotik         |
 | Netcup                | https://github.com/mrueg/external-dns-netcup-webhook                 |
 | Netic                 | https://github.com/neticdk/external-dns-tidydns-webhook              |
 | RouterOS              | https://github.com/benfiola/external-dns-routeros-provider           |
@@ -126,7 +129,6 @@ The following table clarifies the current status of the providers according to t
 | RFC2136 | Alpha | |
 | NS1 | Alpha | |
 | TransIP | Alpha | |
-| RancherDNS | Alpha | |
 | OVH | Alpha | |
 | Scaleway DNS | Alpha | @Sh4d1 |
 | UltraDNS | Alpha | |
@@ -188,7 +190,6 @@ The following tutorials are provided:
 * [OpenStack Designate](docs/tutorials/designate.md)
 * [Oracle Cloud Infrastructure (OCI) DNS](docs/tutorials/oracle.md)
 * [PowerDNS](docs/tutorials/pdns.md)
-* [RancherDNS (RDNS)](docs/tutorials/rdns.md)
 * [RFC2136](docs/tutorials/rfc2136.md)
 * [TransIP](docs/tutorials/transip.md)
 * [OVH](docs/tutorials/ovh.md)

@@ -82,6 +82,7 @@ var canonicalHostedZones = map[string]string{
 	"ap-southeast-2.elb.amazonaws.com":    "Z1GM3OXH4ZPM65",
 	"ap-southeast-3.elb.amazonaws.com":    "Z08888821HLRG5A9ZRTER",
 	"ap-southeast-4.elb.amazonaws.com":    "Z09517862IB2WZLPXG76F",
+	"ap-southeast-5.elb.amazonaws.com":    "Z06010284QMVVW7WO5J",
 	"ap-northeast-1.elb.amazonaws.com":    "Z14GRHDCWA56QT",
 	"eu-central-1.elb.amazonaws.com":      "Z215JYRZR1TBD5",
 	"eu-central-2.elb.amazonaws.com":      "Z06391101F2ZOEP8P5EB3",
@@ -116,6 +117,7 @@ var canonicalHostedZones = map[string]string{
 	"elb.ap-southeast-2.amazonaws.com":    "ZCT6FZBF4DROD",
 	"elb.ap-southeast-3.amazonaws.com":    "Z01971771FYVNCOVWJU1G",
 	"elb.ap-southeast-4.amazonaws.com":    "Z01156963G8MIIL7X90IV",
+	"elb.ap-southeast-5.amazonaws.com":    "Z026317210H9ACVTRO6FB",
 	"elb.ap-northeast-1.amazonaws.com":    "Z31USIVHYNEOWT",
 	"elb.eu-central-1.amazonaws.com":      "Z3F0SRJ5LGBH90",
 	"elb.eu-central-2.amazonaws.com":      "Z02239872DOALSIDCX66S",
@@ -445,7 +447,7 @@ func (p *AWSProvider) records(ctx context.Context, zones map[string]*profiledZon
 		for paginator.HasMorePages() {
 			resp, err := paginator.NextPage(ctx)
 			if err != nil {
-				return nil, fmt.Errorf("failed to list resource records sets for zone %s using aws profile %q: %w", *z.zone.Id, z.profile, err)
+				return nil, provider.NewSoftError(fmt.Errorf("failed to list resource records sets for zone %s using aws profile %q: %w", *z.zone.Id, z.profile, err))
 			}
 
 			for _, r := range resp.ResourceRecordSets {

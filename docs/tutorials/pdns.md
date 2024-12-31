@@ -42,7 +42,7 @@ spec:
       # serviceAccountName: external-dns
       containers:
       - name: external-dns
-        image: registry.k8s.io/external-dns/external-dns:v0.15.0
+        image: registry.k8s.io/external-dns/external-dns:v0.15.1
         args:
         - --source=service # or ingress or both
         - --provider=pdns
@@ -173,3 +173,7 @@ Once the API shows the record correctly, you can double check your record using:
 ```bash
 $ dig @${PDNS_FQDN} echo.example.com.
 ```
+
+## Using CRD source to manage DNS records in PowerDNS
+
+Please refer to the [CRD source documentation](../sources/crd.md#example) for more information.

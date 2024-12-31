@@ -41,6 +41,7 @@ const (
 	sdNamespaceTypePrivate = "private"
 
 	sdInstanceAttrIPV4  = "AWS_INSTANCE_IPV4"
+	sdInstanceAttrIPV6  = "AWS_INSTANCE_IPV6"
 	sdInstanceAttrCname = "AWS_INSTANCE_CNAME"
 	sdInstanceAttrAlias = "AWS_ALIAS_DNS_NAME"
 )
@@ -79,10 +80,12 @@ type AWSSDProvider struct {
 	cleanEmptyService bool
 	// filter services for removal
 	ownerID string
+	// tags to be added to the service
+	tags []sdtypes.Tag
 }
 
 // NewAWSSDProvider initializes a new AWS Cloud Map based Provider.
-func NewAWSSDProvider(domainFilter endpoint.DomainFilter, namespaceType string, dryRun, cleanEmptyService bool, ownerID string, client AWSSDClient) (*AWSSDProvider, error) {
+func NewAWSSDProvider(domainFilter endpoint.DomainFilter, namespaceType string, dryRun, cleanEmptyService bool, ownerID string, tags map[string]string, client AWSSDClient) (*AWSSDProvider, error) {
 	p := &AWSSDProvider{
 		client:              client,
 		dryRun:              dryRun,
@@ -90,6 +93,7 @@ func NewAWSSDProvider(domainFilter endpoint.DomainFilter, namespaceType string, 
 		namespaceTypeFilter: newSdNamespaceFilter(namespaceType),
 		cleanEmptyService:   cleanEmptyService,
 		ownerID:             ownerID,
+		tags:                awsTags(tags),
 	}
 
 	return p, nil
@@ -111,6 +115,15 @@ func newSdNamespaceFilter(namespaceTypeConfig string) sdtypes.NamespaceFilter {
 	default:
 		return sdtypes.NamespaceFilter{}
 	}
+}
+
+// awsTags converts user supplied tags to AWS format
+func awsTags(tags map[string]string) []sdtypes.Tag {
+	awsTags := make([]sdtypes.Tag, 0, len(tags))
+	for k, v := range tags {
+		awsTags = append(awsTags, sdtypes.Tag{Key: aws.String(k), Value: aws.String(v)})
+	}
+	return awsTags
 }
 
 // Records returns list of all endpoints.
@@ -174,10 +187,15 @@ func (p *AWSSDProvider) instancesToEndpoint(ns *sdtypes.NamespaceSummary, srv *s
 			newEndpoint.RecordType = endpoint.RecordTypeCNAME
 			newEndpoint.Targets = append(newEndpoint.Targets, inst.Attributes[sdInstanceAttrAlias])
 
-			// IP-based target
+			// IPv4-based target
 		} else if inst.Attributes[sdInstanceAttrIPV4] != "" {
 			newEndpoint.RecordType = endpoint.RecordTypeA
 			newEndpoint.Targets = append(newEndpoint.Targets, inst.Attributes[sdInstanceAttrIPV4])
+
+			// IPv6-based target
+		} else if inst.Attributes[sdInstanceAttrIPV6] != "" {
+			newEndpoint.RecordType = endpoint.RecordTypeAAAA
+			newEndpoint.Targets = append(newEndpoint.Targets, inst.Attributes[sdInstanceAttrIPV6])
 		} else {
 			log.Warnf("Invalid instance \"%v\" found in service \"%v\"", inst, srv.Name)
 		}
@@ -400,6 +418,7 @@ func (p *AWSSDProvider) CreateService(ctx context.Context, namespaceID *string, 
 				}},
 			},
 			NamespaceId: namespaceID,
+			Tags:        p.tags,
 		})
 		if err != nil {
 			return nil, err
@@ -472,15 +491,18 @@ func (p *AWSSDProvider) RegisterInstance(ctx context.Context, service *sdtypes.S
 
 		attr := make(map[string]string)
 
-		if ep.RecordType == endpoint.RecordTypeCNAME {
+		switch ep.RecordType {
+		case endpoint.RecordTypeCNAME:
 			if p.isAWSLoadBalancer(target) {
 				attr[sdInstanceAttrAlias] = target
 			} else {
 				attr[sdInstanceAttrCname] = target
 			}
-		} else if ep.RecordType == endpoint.RecordTypeA {
+		case endpoint.RecordTypeA:
 			attr[sdInstanceAttrIPV4] = target
-		} else {
+		case endpoint.RecordTypeAAAA:
+			attr[sdInstanceAttrIPV6] = target
+		default:
 			return fmt.Errorf("invalid endpoint type (%v)", ep)
 		}
 
@@ -584,16 +606,17 @@ func (p *AWSSDProvider) parseHostname(hostname string) (namespace string, servic
 
 // determine service routing policy based on endpoint type
 func (p *AWSSDProvider) routingPolicyFromEndpoint(ep *endpoint.Endpoint) sdtypes.RoutingPolicy {
-	if ep.RecordType == endpoint.RecordTypeA {
+	if ep.RecordType == endpoint.RecordTypeA || ep.RecordType == endpoint.RecordTypeAAAA {
 		return sdtypes.RoutingPolicyMultivalue
 	}
 
 	return sdtypes.RoutingPolicyWeighted
 }
 
-// determine service type (A, CNAME) from given endpoint
+// determine service type (A, AAAA, CNAME) from given endpoint
 func (p *AWSSDProvider) serviceTypeFromEndpoint(ep *endpoint.Endpoint) sdtypes.RecordType {
-	if ep.RecordType == endpoint.RecordTypeCNAME {
+	switch ep.RecordType {
+	case endpoint.RecordTypeCNAME:
 		// FIXME service type is derived from the first target only. Theoretically this may be problem.
 		// But I don't see a scenario where one endpoint contains targets of different types.
 		if p.isAWSLoadBalancer(ep.Targets[0]) {
@@ -601,8 +624,11 @@ func (p *AWSSDProvider) serviceTypeFromEndpoint(ep *endpoint.Endpoint) sdtypes.R
 			return sdtypes.RecordTypeA
 		}
 		return sdtypes.RecordTypeCname
+	case endpoint.RecordTypeAAAA:
+		return sdtypes.RecordTypeAaaa
+	default:
+		return sdtypes.RecordTypeA
 	}
-	return sdtypes.RecordTypeA
 }
 
 // determine if a given hostname belongs to an AWS load balancer

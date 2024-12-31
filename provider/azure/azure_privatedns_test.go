@@ -238,6 +238,7 @@ func newAzurePrivateDNSProvider(domainFilter endpoint.DomainFilter, zoneNameFilt
 		dryRun:           dryRun,
 		resourceGroup:    resourceGroup,
 		zonesClient:      privateZonesClient,
+		zonesCache:       &zonesCache[privatedns.PrivateZone]{duration: 0},
 		recordSetsClient: privateRecordsClient,
 	}
 }
@@ -353,9 +354,9 @@ func TestAzurePrivateDNSApplyChanges(t *testing.T) {
 }
 
 func TestAzurePrivateDNSApplyChangesDryRun(t *testing.T) {
-	recordsClient := mockRecordSetsClient{}
+	recordsClient := mockPrivateRecordSetsClient{}
 
-	testAzureApplyChangesInternal(t, true, &recordsClient)
+	testAzurePrivateDNSApplyChangesInternal(t, true, &recordsClient)
 
 	validateAzureEndpoints(t, recordsClient.deletedEndpoints, []*endpoint.Endpoint{})
 
@@ -470,9 +471,9 @@ func TestAzurePrivateDNSNameFilter(t *testing.T) {
 }
 
 func TestAzurePrivateDNSApplyChangesZoneName(t *testing.T) {
-	recordsClient := mockRecordSetsClient{}
+	recordsClient := mockPrivateRecordSetsClient{}
 
-	testAzureApplyChangesInternalZoneName(t, false, &recordsClient)
+	testAzurePrivateDNSApplyChangesInternalZoneName(t, false, &recordsClient)
 
 	validateAzureEndpoints(t, recordsClient.deletedEndpoints, []*endpoint.Endpoint{
 		endpoint.NewEndpoint("deleted.foo.example.com", endpoint.RecordTypeA, ""),

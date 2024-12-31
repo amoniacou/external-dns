@@ -159,7 +159,6 @@ func (p *DigitalOceanProvider) Records(ctx context.Context) ([]*endpoint.Endpoin
 	endpoints := []*endpoint.Endpoint{}
 	for _, zone := range zones {
 		records, err := p.fetchRecords(ctx, zone.Name)
-
 		if err != nil {
 			return nil, err
 		}
