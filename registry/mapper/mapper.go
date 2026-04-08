@@ -38,12 +38,16 @@ var (
 		endpoint.RecordTypeNAPTR,
 	}
 
-	// affixOnlyRecords are record types that can only be mapped when
+	// requiresTemplateRecords are record types that can only be mapped when
 	// %{record_type} is present in the prefix/suffix. Without it,
 	// "txt-" in default position collides with TXT ownership record naming.
-	affixOnlyRecords = []string{
+	requiresTemplateRecords = []string{
 		endpoint.RecordTypeTXT,
 	}
+
+	// allMappableRecords is the union of supportedRecords and requiresTemplateRecords,
+	// pre-computed to avoid allocation on every call to dropAffixExtractType.
+	allMappableRecords = append(supportedRecords, requiresTemplateRecords...)
 )
 
 // NameMapper is the interface for mapping between the endpoint for the source
@@ -152,7 +156,7 @@ func (a AffixNameMapper) dropAffixExtractType(name string) (string, string) {
 	suffix := a.suffix
 
 	if a.recordTypeInAffix() {
-		for _, t := range append(supportedRecords, affixOnlyRecords...) {
+		for _, t := range allMappableRecords {
 			tLower := strings.ToLower(t)
 			iPrefix := strings.ReplaceAll(prefix, RecordTemplate, tLower)
 			iSuffix := strings.ReplaceAll(suffix, RecordTemplate, tLower)

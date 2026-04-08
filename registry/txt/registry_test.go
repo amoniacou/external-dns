@@ -89,22 +89,27 @@ func testTXTRegistryNew(t *testing.T) {
 	_, ok = r.mapper.(mapper.AffixNameMapper)
 	assert.True(t, ok)
 
-	// TXT in managedRecordTypes requires %{record_type} in prefix or suffix
-	_, err = newRegistry(p, "", "", "owner", time.Hour, "", []string{"TXT"}, []string{}, false, nil, "")
-	require.Error(t, err)
-	assert.Contains(t, err.Error(), "managing TXT records requires")
+	t.Run("TXT in managedRecordTypes without record_type template is rejected", func(t *testing.T) {
+		_, err := newRegistry(p, "", "", "owner", time.Hour, "", []string{"TXT"}, []string{}, false, nil, "")
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "managing TXT records requires")
+	})
 
-	_, err = newRegistry(p, "txt-", "", "owner", time.Hour, "", []string{"A", "TXT"}, []string{}, false, nil, "")
-	require.Error(t, err)
-	assert.Contains(t, err.Error(), "managing TXT records requires")
+	t.Run("TXT in managedRecordTypes with plain prefix is rejected", func(t *testing.T) {
+		_, err := newRegistry(p, "txt-", "", "owner", time.Hour, "", []string{"A", "TXT"}, []string{}, false, nil, "")
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "managing TXT records requires")
+	})
 
-	// TXT with %{record_type} in prefix — OK
-	_, err = newRegistry(p, "%{record_type}-e-dns.", "", "owner", time.Hour, "", []string{"TXT"}, []string{}, false, nil, "")
-	require.NoError(t, err)
+	t.Run("TXT in managedRecordTypes with record_type prefix is accepted", func(t *testing.T) {
+		_, err := newRegistry(p, "%{record_type}-e-dns.", "", "owner", time.Hour, "", []string{"TXT"}, []string{}, false, nil, "")
+		require.NoError(t, err)
+	})
 
-	// TXT with %{record_type} in suffix — OK
-	_, err = newRegistry(p, "", "-%{record_type}", "owner", time.Hour, "", []string{"TXT"}, []string{}, false, nil, "")
-	require.NoError(t, err)
+	t.Run("TXT in managedRecordTypes with record_type suffix is accepted", func(t *testing.T) {
+		_, err := newRegistry(p, "", "-%{record_type}", "owner", time.Hour, "", []string{"TXT"}, []string{}, false, nil, "")
+		require.NoError(t, err)
+	})
 }
 
 func testTXTRegistryRecords(t *testing.T) {
@@ -1855,6 +1860,7 @@ func TestTXTRegistryRecreatesMissingRecords(t *testing.T) {
 	ownerId := "owner"
 	tests := []struct {
 		name           string
+		prefix         string
 		desired        []*endpoint.Endpoint
 		existing       []*endpoint.Endpoint
 		expectedCreate []*endpoint.Endpoint
@@ -1988,6 +1994,65 @@ func TestTXTRegistryRecreatesMissingRecords(t *testing.T) {
 			},
 			expectedCreate: []*endpoint.Endpoint{},
 		},
+		{
+			name:   "Recreate missing A record with record_type prefix",
+			prefix: "%{record_type}.",
+			desired: []*endpoint.Endpoint{
+				newEndpointWithOwner("new-record-1.test-zone.example.org", "1.1.1.1", endpoint.RecordTypeA, ""),
+			},
+			existing: []*endpoint.Endpoint{
+				newEndpointWithOwner("a.new-record-1.test-zone.example.org", "\"heritage=external-dns,external-dns/owner="+ownerId+"\"", endpoint.RecordTypeTXT, ownerId),
+			},
+			expectedCreate: []*endpoint.Endpoint{
+				newEndpointWithOwner("new-record-1.test-zone.example.org", "1.1.1.1", endpoint.RecordTypeA, ownerId),
+			},
+		},
+		{
+			name:   "Recreate missing A and CNAME records with record_type prefix",
+			prefix: "%{record_type}.",
+			desired: []*endpoint.Endpoint{
+				newEndpointWithOwner("new-record-1.test-zone.example.org", "1.1.1.1", endpoint.RecordTypeA, ""),
+				newEndpointWithOwner("new-record-2.test-zone.example.org", "new-loadbalancer-1.lb.com", endpoint.RecordTypeCNAME, ""),
+			},
+			existing: []*endpoint.Endpoint{
+				newEndpointWithOwner("a.new-record-1.test-zone.example.org", "\"heritage=external-dns,external-dns/owner="+ownerId+"\"", endpoint.RecordTypeTXT, ownerId),
+				newEndpointWithOwner("cname.new-record-2.test-zone.example.org", "\"heritage=external-dns,external-dns/owner="+ownerId+"\"", endpoint.RecordTypeTXT, ownerId),
+			},
+			expectedCreate: []*endpoint.Endpoint{
+				newEndpointWithOwner("new-record-1.test-zone.example.org", "1.1.1.1", endpoint.RecordTypeA, ownerId),
+				newEndpointWithOwner("new-record-2.test-zone.example.org", "new-loadbalancer-1.lb.com", endpoint.RecordTypeCNAME, ownerId),
+			},
+		},
+		{
+			name:   "Recreate missing TXT record with record_type prefix",
+			prefix: "%{record_type}.",
+			desired: []*endpoint.Endpoint{
+				newEndpointWithOwner("random.test-zone.example.org", "some-text-value", endpoint.RecordTypeTXT, ""),
+			},
+			existing: []*endpoint.Endpoint{
+				newEndpointWithOwner("txt.random.test-zone.example.org", "\"heritage=external-dns,external-dns/owner="+ownerId+"\"", endpoint.RecordTypeTXT, ownerId),
+			},
+			expectedCreate: []*endpoint.Endpoint{
+				newEndpointWithOwner("random.test-zone.example.org", "some-text-value", endpoint.RecordTypeTXT, ownerId),
+			},
+		},
+		{
+			name:   "Only one A record is missing with record_type prefix",
+			prefix: "%{record_type}.",
+			desired: []*endpoint.Endpoint{
+				newEndpointWithOwner("record-1.test-zone.example.org", "1.1.1.1", endpoint.RecordTypeA, ""),
+				newEndpointWithOwner("record-2.test-zone.example.org", "1.1.1.2", endpoint.RecordTypeA, ""),
+			},
+			existing: []*endpoint.Endpoint{
+				newEndpointWithOwner("a.record-1.test-zone.example.org", "\"heritage=external-dns,external-dns/owner="+ownerId+"\"", endpoint.RecordTypeTXT, ownerId),
+
+				newEndpointWithOwner("record-2.test-zone.example.org", "1.1.1.2", endpoint.RecordTypeA, ownerId),
+				newEndpointWithOwner("a.record-2.test-zone.example.org", "\"heritage=external-dns,external-dns/owner="+ownerId+"\"", endpoint.RecordTypeTXT, ownerId),
+			},
+			expectedCreate: []*endpoint.Endpoint{
+				newEndpointWithOwner("record-1.test-zone.example.org", "1.1.1.1", endpoint.RecordTypeA, ownerId),
+			},
+		},
 	}
 	for _, tt := range tests {
 		for _, setIdentifier := range []string{"", "set-identifier"} {
@@ -2032,9 +2097,12 @@ func TestTXTRegistryRecreatesMissingRecords(t *testing.T) {
 						isCalled = true
 					}
 
-					// When: Apply changes to recreate missing A records
+					// When: Apply changes to recreate missing records
 					managedRecords := []string{endpoint.RecordTypeA, endpoint.RecordTypeCNAME, endpoint.RecordTypeAAAA}
-					registry, err := newRegistry(p, "", "", ownerId, time.Hour, "", managedRecords, nil, false, nil, "")
+					if strings.Contains(tt.prefix, mapper.RecordTemplate) {
+						managedRecords = append(managedRecords, endpoint.RecordTypeTXT, endpoint.RecordTypeMX)
+					}
+					registry, err := newRegistry(p, tt.prefix, "", ownerId, time.Hour, "", managedRecords, nil, false, nil, "")
 					assert.NoError(t, err)
 
 					expectedRecords := append(existing, expectedCreate...) // nolint:gocritic
